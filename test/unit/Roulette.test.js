@@ -4,202 +4,355 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 !developmentChains.includes(network.name)
 	? describe.skip
-	: describe("Raffle Unit Tests", function () {
-			let raffle, raffleContract, vrfCoordinatorV2Mock, raffleEntranceFee, interval, player // , deployer
-
+	: describe("Roulette Unit Tests", function () {
+			let roulette, rouletteContract, vrfCoordinatorV2Mock, interval
+			const chainId = network.config.chainId
+			
 			beforeEach(async () => {
-				accounts = await ethers.getSigners() // could also do with getNamedAccounts
-				//   deployer = accounts[0]
-				player = accounts[1]
-				await deployments.fixture(["mocks", "raffle"]) // Deploys modules with the tags "mocks" and "raffle"
-				vrfCoordinatorV2Mock = await ethers.getContract("VRFCoordinatorV2Mock") // Returns a new connection to the VRFCoordinatorV2Mock contract
-				raffleContract = await ethers.getContract("Raffle") // Returns a new connection to the Raffle contract
-				raffle = raffleContract.connect(player) // Returns a new instance of the Raffle contract connected to player
-				raffleEntranceFee = await raffle.getEntranceFee()
-				interval = await raffle.getInterval()
+				[deployer, player] = await ethers.getSigners()
+				await deployments.fixture(["all"])
+				vrfCoordinatorV2Mock = await ethers.getContract("VRFCoordinatorV2Mock")
+				rouletteContract = await ethers.getContract("Roulette", deployer) // Returns a new connection to the Roulette contract
+				roulette = rouletteContract.connect(player) // Returns a new instance of the Roulette contract connected to player
+				await roulette.createBet(5, [0], {value: ethers.utils.parseEther("1")}) // HERE equal2players
+				await roulette.createBet(9, [1], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(8, [0], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(7, [1], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(6, [2], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(4, [25,26,27,28,29,30], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(3, [28,29,31,32], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(2, [28,29,30], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(1, [28,31], {value: ethers.utils.parseEther("1")}) 
+				await roulette.createBet(0, [28], {value: ethers.utils.parseEther("1")}) 
+
+				// await roulette.createBet(9, [1], {value: 1000000001}) // For CheckUpkeep tests only!
+				
+				interval = await roulette.getInterval();
+				
 			})
 
 			describe("constructor", function () {
-				it("initializes the raffle correctly", async () => {
-					// Ideally, we'd separate these out so that only 1 assert per "it" block
-					// And ideally, we'd make this check everything
-					const raffleState = (await raffle.getRaffleState()).toString()
-					// Comparisons for Raffle initialization:
-					assert.equal(raffleState, "0")
+				
+				it("initializes the roulette correctly", async () => {
+					
+					
+					assert.equal(await roulette.owner(), deployer.address.toString())
+
+					assert.equal(
+						await roulette.minimalBet(),
+						networkConfig[chainId]["minimalBet"]
+					)
+					assert.equal(
+						await roulette.startGameValue(),
+						"10000000000000000"
+					)
 					assert.equal(
 						interval.toString(),
 						networkConfig[network.config.chainId]["keepersUpdateInterval"]
 					)
+					
+		
+       
 				})
 			})
 
-			describe("enterRaffle", function () {
+			describe("createBet", function () {
+
 				it("reverts when you don't pay enough", async () => {
-					await expect(raffle.enterRaffle()).to.be.revertedWith(
-						// is reverted when not paid enough or raffle is not open
-						"Raffle__SendMoreToEnterRaffle"
+				await expect(roulette.createBet(0, [0], {value: 1})).to.be.reverted
+				})
+				
+				it("creates a bet and adds it in the array of Bets with correct data", async () => {
+					
+					expect(await roulette.getNumberOfPlayers()).to.be.equal(10) // HERE equal2players
+					
+					const bet = await roulette.getFirstPlayer()
+					expect(bet[0]).to.be.equal(player.address)
+					expect(bet[1]).to.be.equal(ethers.utils.parseEther("1"))
+					expect(bet[2]).to.be.equal(5)
+					expect(bet[3].join()).to.be.equal("0")
+
+					expect(await roulette.moneyInTheBank()).to.be.equal(BigInt(ethers.utils.parseEther("10"))) // HERE equal2players
+					
+					})
+				
+				it("emits event on createBet", async () => {
+					await expect(roulette.createBet(0, [0], {value: ethers.utils.parseEther("1")})).to.emit(
+						roulette,
+						"BetCreated"
 					)
 				})
-				it("records player when they enter", async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
-					const contractPlayer = await raffle.getPlayer(0)
-					assert.equal(player.address, contractPlayer)
-				})
-				it("emits event on enter", async () => {
-					await expect(raffle.enterRaffle({ value: raffleEntranceFee })).to.emit(
-						// emits RaffleEnter event if entered to index player(s) address
-						raffle,
-						"RaffleEnter"
-					)
-				})
-				it("doesn't allow entrance when raffle is calculating", async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
-					// for a documentation of the methods below, go here: https://hardhat.org/hardhat-network/reference
-					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
-					await network.provider.request({ method: "evm_mine", params: [] })
-					// we pretend to be a keeper for a second
-					await raffle.performUpkeep([]) // changes the state to calculating for our comparison below
-					await expect(
-						raffle.enterRaffle({ value: raffleEntranceFee })
-					).to.be.revertedWith(
-						// is reverted as raffle is calculating
-						"Raffle__RaffleNotOpen"
-					)
-				})
+
 			})
+
+
+
 			describe("checkUpkeep", function () {
-				it("returns false if people haven't sent any ETH", async () => {
-					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
-					await network.provider.request({ method: "evm_mine", params: [] })
-					const { upkeepNeeded } = await raffle.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers)
-					assert(!upkeepNeeded)
-				})
-				it("returns false if raffle isn't open", async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
-					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
-					await network.provider.request({ method: "evm_mine", params: [] })
-					await raffle.performUpkeep([]) // changes the state to calculating
-					const raffleState = await raffle.getRaffleState() // stores the new state
-					const { upkeepNeeded } = await raffle.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers)
-					assert.equal(raffleState.toString() == "1", upkeepNeeded == false)
-				})
+
+				// TEST FOR WITHOUT ANY BET
+				
+				// it("returns false if betsArr is empty", async () => {
+				// 	await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+				// 	await network.provider.request({ method: "evm_mine", params: [] })
+
+				// 	const { upkeepNeeded } = await roulette.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && hasPlayers && hasStartGameValue);
+
+                //   	assert(!upkeepNeeded)
+
+				// })
+
+
+
+				// TEST FOR SMALL AMOUNT BET
+
+				// it("returns false if startGameValue threshold not crossed", async () => {
+				// 	await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+				// 	await network.provider.request({ method: "evm_mine", params: [] })
+
+				// 	const { upkeepNeeded } = await roulette.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && hasPlayers && hasStartGameValue);
+
+                //   	assert(!upkeepNeeded)
+
+				// })
+
+
+				// TEST FOR NOT ENOUGH TIME PASSED
+
 				it("returns false if enough time hasn't passed", async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
-					await network.provider.send("evm_increaseTime", [interval.toNumber() - 5]) // use a higher number here if this test fails
+					await network.provider.send("evm_increaseTime", [interval.toNumber() - 25]) // use a higher number here if this test fails
 					await network.provider.request({ method: "evm_mine", params: [] })
-					const { upkeepNeeded } = await raffle.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers)
-					assert(!upkeepNeeded)
+
+					const { upkeepNeeded } = await roulette.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && hasPlayers && hasStartGameValue);
+
+                  	assert(!upkeepNeeded)
+
 				})
-				it("returns true if enough time has passed, has players, eth, and is open", async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
+
+				// TEST FOR EVERYTHING IS OK
+
+				it("returns true if startGameValue threshold IS crossed, betsArr length greater than 0 and enough time has passed", async () => {
 					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
 					await network.provider.request({ method: "evm_mine", params: [] })
-					const { upkeepNeeded } = await raffle.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers)
-					assert(upkeepNeeded)
+
+					const { upkeepNeeded } = await roulette.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && hasPlayers && hasStartGameValue);
+
+                  	assert(upkeepNeeded)
+
 				})
+
+				
 			})
+
+			
 
 			describe("performUpkeep", function () {
-				it("can only run if checkupkeep is true", async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
-					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
-					await network.provider.request({ method: "evm_mine", params: [] })
-					const tx = await raffle.performUpkeep("0x")
-					assert(tx)
-				})
-				it("reverts if checkup is false", async () => {
-					await expect(raffle.performUpkeep("0x")).to.be.revertedWith(
-						"Raffle__UpkeepNotNeeded"
-					)
-				})
-				it("updates the raffle state and emits a requestId", async () => {
-					// Too many asserts in this test!
-					await raffle.enterRaffle({ value: raffleEntranceFee })
-					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
-					await network.provider.request({ method: "evm_mine", params: [] })
-					const txResponse = await raffle.performUpkeep("0x") // emits requestId
-					const txReceipt = await txResponse.wait(1) // waits 1 block
-					const raffleState = await raffle.getRaffleState() // updates state
-					const requestId = txReceipt.events[1].args.requestId
-					assert(requestId.toNumber() > 0)
-					assert(raffleState == 1) // 0 = open, 1 = calculating
-				})
-			})
-			describe("fulfillRandomWords", function () {
 				beforeEach(async () => {
-					await raffle.enterRaffle({ value: raffleEntranceFee })
+					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+					await network.provider.request({ method: "evm_mine", params: [] })
+					
+				})
+
+				it ("emits RequestedNumber event", async () => {
+					await expect(roulette.performUpkeep("0x")).to.emit(
+									roulette,
+									"RequestedNumber"
+								)
+
+				})
+				it ("emits GameStarted event", async () => {
+					await expect(roulette.performUpkeep("0x")).to.emit(
+									roulette,
+									"GameStarted"
+								)
+
+				})
+			
+
+				it("starts a game", async () => {
+
+					expect(await roulette.getNumberOfPlayers()).to.be.equal(10) // HERE equal2players
+
+					
+
+					const tx = await roulette.performUpkeep("0x")
+					const txRec = await tx.wait(1) 
+					const requestId = txRec.events[1].args.requestId
+
+					assert.equal(requestId.toNumber(), 1)
+
+					
+
+					// await expect(await roulette.getNumberOfPlayers()).to.be.equal(0)
+					// expect(await roulette.moneyInTheBank()).to.be.equal(0)
+
+				})
+			
+				
+
+			})
+
+
+
+			
+			describe("fulfillRandomWords", function () {
+
+				beforeEach(async () => {
 					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
 					await network.provider.request({ method: "evm_mine", params: [] })
 				})
-				it("can only be called after performupkeep", async () => {
-					await expect(
-						vrfCoordinatorV2Mock.fulfillRandomWords(0, raffle.address) // reverts if not fulfilled
-					).to.be.revertedWith("nonexistent request")
-					await expect(
-						vrfCoordinatorV2Mock.fulfillRandomWords(1, raffle.address) // reverts if not fulfilled
-					).to.be.revertedWith("nonexistent request")
+			
+				it ("emits GameFinished event", async () => {
+					const tx = await roulette.performUpkeep("0x")
+					const txRec = await tx.wait(1) 
+					const requestId = txRec.events[1].args.requestId
+					assert.equal(requestId.toNumber(), 1) // requestId
+					
+					expect(vrfCoordinatorV2Mock.fulfillRandomWords(1, roulette.address)).to.emit(
+						roulette,
+						"GameFinished"
+					)
+
+					
+
+				})
+				
+				it("Receiving random number; checking all bets for winning; payout winning bets to mapping; returning losing bets amounts to casino; refreshing betsArr, lastWinningNumber and moneyInTheBank; starting new spin; allowing to withdraw for players and owner", async () => {
+					await expect(await roulette.getNumberOfPlayers()).to.be.equal(10) // HERE equal2players
+
+					const bet = await roulette.getFirstPlayer()
+					expect(bet[0]).to.be.equal(player.address)
+					expect(bet[1]).to.be.equal(ethers.utils.parseEther("1"))
+					expect(bet[2]).to.be.equal(5)
+					expect(bet[3].join()).to.be.equal("0")
+
+					const bet2 = await roulette.getSecondPlayer()
+					expect(bet2[0]).to.be.equal(player.address)
+					expect(bet2[1]).to.be.equal(ethers.utils.parseEther("1"))
+					expect(bet2[2]).to.be.equal(9)
+					expect(bet2[3].join()).to.be.equal("1")
+
+					const tx = await roulette.performUpkeep("0x")
+					const txRec = await tx.wait(1) 
+					const requestId = txRec.events[1].args.requestId
+					assert.equal(requestId.toNumber(), 1) // requestId
+					
+					await vrfCoordinatorV2Mock.fulfillRandomWords(1, roulette.address)  // requestId
+					 
+				
+				
+					expect(await roulette.moneyInTheBank()).to.be.equal(0)
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
+
+					expect(await roulette.getNumberOfPlayers()).to.be.equal(0) // HERE equal2players
+					 
+					expect(await roulette.lastWinningNumber()).to.be.equal(28)
+					
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("91")) //ethers.utils.parseEther("2")
+					 
+
+					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+					await network.provider.request({ method: "evm_mine", params: [] })
+
+
+					// NEXT SPIN
+					await roulette.createBet(9, [1], {value: ethers.utils.parseEther("1")})
+					await expect(await roulette.getNumberOfPlayers()).to.be.equal(1)
+
+
+					const tx2 = await roulette.performUpkeep("0x")
+					const txRec2 = await tx2.wait(1) 
+					const requestId2 = txRec2.events[1].args.requestId
+					assert.equal(requestId2.toNumber(), 2)	
+
+					await vrfCoordinatorV2Mock.fulfillRandomWords(2, roulette.address) 
+
+					expect(await roulette.moneyInTheBank()).to.be.equal(0)
+					expect(await roulette.lastWinningNumber()).to.be.equal(12)
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("93")) //ethers.utils.parseEther("2")
+
+
+
+
+					// Withdrawing for player
+					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("111"))
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
+
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("93")) //ethers.utils.parseEther("2")
+
+					// await roulette.withdrawPlayer()
+
+					await expect(await roulette.withdrawPlayer()).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-93"), ethers.utils.parseEther("93")]);
+
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("0"))
+
+					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("18"))
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
+
+
+
+
+
+					// Withdrawing for owner
+
+					// await roulette.connect(deployer).withdrawOwner()	
+
+					await expect(await roulette.connect(deployer).withdrawOwner()).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-1"), ethers.utils.parseEther("1")]);
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("0"))
+
+					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("17"))
+
+
+
+
+
+					// 3rd SPIN
+					await roulette.createBet(8, [1], {value: ethers.utils.parseEther("1")}) // 2
+					await roulette.createBet(7, [0], {value: ethers.utils.parseEther("1")}) // lost
+					await roulette.createBet(6, [0], {value: ethers.utils.parseEther("1")}) // lost
+					await roulette.createBet(6, [1], {value: ethers.utils.parseEther("1")}) // lost
+					await roulette.createBet(5, [1], {value: ethers.utils.parseEther("1")}) // lost
+					await roulette.createBet(5, [2], {value: ethers.utils.parseEther("1")}) // lost
+			
+					await expect(await roulette.getNumberOfPlayers()).to.be.equal(6)
+
+					
+
+
+					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+					await network.provider.request({ method: "evm_mine", params: [] })
+
+
+					const tx3 = await roulette.performUpkeep("0x")
+					const txRec3 = await tx3.wait(1) 
+					const requestId3 = txRec3.events[1].args.requestId
+					assert.equal(requestId3.toNumber(), 3)	
+
+					await vrfCoordinatorV2Mock.fulfillRandomWords(3, roulette.address) 
+
+					expect(await roulette.lastWinningNumber()).to.be.equal(31)
+
+
+					expect(await roulette.moneyInTheBank()).to.be.equal(0)
+
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("5"))
+
+
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("2")) //ethers.utils.parseEther("2")
+
+					await expect(await roulette.connect(deployer).withdrawOwner()).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-5"), ethers.utils.parseEther("5")]);
+
+					await expect(await roulette.withdrawPlayer()).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-2"), ethers.utils.parseEther("2")]);
+
+					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("16"))
+					
 				})
 
-				// This test is too big...
-				// This test simulates users entering the raffle and wraps the entire functionality of the raffle
-				// inside a promise that will resolve if everything is successful.
-				// An event listener for the WinnerPicked is set up
-				// Mocks of chainlink keepers and vrf coordinator are used to kickoff this winnerPicked event
-				// All the assertions are done once the WinnerPicked event is fired
-				it("picks a winner, resets, and sends money", async () => {
-					const additionalEntrances = 3 // to test
-					const startingIndex = 2
-					for (let i = startingIndex; i < startingIndex + additionalEntrances; i++) {
-						// i = 2; i < 5; i=i+1
-						raffle = raffleContract.connect(accounts[i]) // Returns a new instance of the Raffle contract connected to player
-						await raffle.enterRaffle({ value: raffleEntranceFee })
-					}
-					const startingTimeStamp = await raffle.getLastTimeStamp() // stores starting timestamp (before we fire our event)
-
-					// This will be more important for our staging tests...
-					await new Promise(async (resolve, reject) => {
-						raffle.once("WinnerPicked", async () => {
-							// event listener for WinnerPicked
-							console.log("WinnerPicked event fired!")
-							// assert throws an error if it fails, so we need to wrap
-							// it in a try/catch so that the promise returns event
-							// if it fails.
-							try {
-								// Now lets get the ending values...
-								const recentWinner = await raffle.getRecentWinner()
-								const raffleState = await raffle.getRaffleState()
-								const winnerBalance = await accounts[2].getBalance()
-								const endingTimeStamp = await raffle.getLastTimeStamp()
-								await expect(raffle.getPlayer(0)).to.be.reverted
-								// Comparisons to check if our ending values are correct:
-								assert.equal(recentWinner.toString(), accounts[2].address)
-								assert.equal(raffleState, 0)
-								assert.equal(
-									winnerBalance.toString(),
-									startingBalance // startingBalance + ( (raffleEntranceFee * additionalEntrances) + raffleEntranceFee )
-										.add(
-											raffleEntranceFee
-												.mul(additionalEntrances)
-												.add(raffleEntranceFee)
-										)
-										.toString()
-								)
-								assert(endingTimeStamp > startingTimeStamp)
-								resolve() // if try passes, resolves the promise
-							} catch (e) {
-								reject(e) // if try fails, rejects the promise
-							}
-						})
-
-						// kicking off the event by mocking the chainlink keepers and vrf coordinator
-						const tx = await raffle.performUpkeep("0x")
-						const txReceipt = await tx.wait(1)
-						const startingBalance = await accounts[2].getBalance()
-						await vrfCoordinatorV2Mock.fulfillRandomWords(
-							txReceipt.events[1].args.requestId,
-							raffle.address
-						)
-					})
-				})
+				
 			})
 	  })
