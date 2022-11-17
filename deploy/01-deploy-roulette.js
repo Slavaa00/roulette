@@ -9,12 +9,12 @@ const {
 const { verify } = require("../utils/verify")
 
 const FUND_AMOUNT = ethers.utils.parseEther("1") // 1 Ether, or 1e18 (10^18) Wei
-const INITIAL_AMOUNT = 50000000
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
 	const { deploy, log } = deployments
 	const { deployer , player } = await getNamedAccounts()
 	const chainId = network.config.chainId
+	const INITIAL_AMOUNT = ((chainId == 31337) ? ethers.utils.parseEther("100") : 50000000)
 
 	// let linkAddress = networkConfig[chainId]["linkAddress"]
 	// let wrapperAddress = networkConfig[chainId]["wrapperAddress"]
