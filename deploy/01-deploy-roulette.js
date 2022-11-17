@@ -9,7 +9,7 @@ const {
 const { verify } = require("../utils/verify")
 
 const FUND_AMOUNT = ethers.utils.parseEther("1") // 1 Ether, or 1e18 (10^18) Wei
-const INITIAL_AMOUNT = ethers.utils.parseEther("100") 
+const INITIAL_AMOUNT = 50000000
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
 	const { deploy, log } = deployments
