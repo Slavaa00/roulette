@@ -14,7 +14,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 	const { deploy, log } = deployments
 	const { deployer , player } = await getNamedAccounts()
 	const chainId = network.config.chainId
-	const INITIAL_AMOUNT = ((chainId == 31337) ? ethers.utils.parseEther("100") : 50000000)
+	const INITIAL_AMOUNT = ((chainId == 31337) ? ethers.utils.parseEther("100") : ethers.utils.parseEther("0.1"))
 
 	// let linkAddress = networkConfig[chainId]["linkAddress"]
 	// let wrapperAddress = networkConfig[chainId]["wrapperAddress"]
@@ -50,6 +50,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 		networkConfig[chainId]["keepersUpdateInterval"],
 		networkConfig[chainId]["startGameValue"],
 		networkConfig[chainId]["minimalBet"],
+		networkConfig[chainId]["maximumBet"],
 		
 		
 	]

@@ -9,17 +9,20 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 
 import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
-import "hardhat/console.sol";
+
 
 /* Errors */
-// error Roulette__PleaseSendMoreMoney();
-// error Roulette__NotEnoughMoneyToStart();
-// error Roulette__UpkeepNotNeeded(uint256 currentBalance, uint256 numberOfBets);
-// error Roulette__TransactionFailed();
-// error Roulette__IsContract();
-// error Roulette__NotAnOwner();
-// error Roulette__CasinoIsEmpty();
-// error Roulette__EmptyBalance();
+error Roulette__PleaseSendMoreMoney();
+error Roulette__ExceedsMaximumBet();
+error Roulette__NotEnoughMoneyToStart();
+error Roulette__UpkeepNotNeeded(uint256 currentBalance, uint256 numberOfBets);
+error Roulette__TransactionFailed();
+error Roulette__IsContract();
+error Roulette__NotAnOwner();
+error Roulette__CasinoIsEmpty();
+error Roulette__EmptyBalance();
+error Roulette__PleaseWaitForLiquidity();
+
 
 /**@title Roulette contract
  * @author Vyacheslav Pyzhov
@@ -33,11 +36,13 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		bytes32 _gasLane,
 		uint256 _interval,
 		uint256 _startGameValue,
-		uint256 _minimalBet
+		uint256 _minimalBet,
+		uint256 _maximumBet
 	) payable VRFConsumerBaseV2(_vrfCoordinatorV2) {
 		owner = msg.sender;
 		startGameValue = _startGameValue;
 		minimalBet = _minimalBet;
+		maximumBet = _maximumBet;
 
 		vrfCoordinator = VRFCoordinatorV2Interface(_vrfCoordinatorV2);
 		subscriptionId = _subscriptionId;
@@ -50,7 +55,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	struct Bet {
 		address player;
 		uint256 amount;
-		uint8 betType; // 0: oneNumber, 1: twoNumbers, 2: threeNumbers, 3: fourNumbers, 4: sixNumbers, 5: column,       6: dozen 7: eighteen, 8: modulus, 9: color:
+		uint8 betType; // 0: oneNumber, 1: twoNumbers, 2: threeNumbers, 3: fourNumbers, 4: sixNumbers, 5: column, 6: dozen 7: eighteen, 8: modulus, 9: color:
 		uint8[] numbers;
 	}
 
@@ -61,7 +66,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	// Chainlink VRF Variables
 	VRFCoordinatorV2Interface private immutable vrfCoordinator;
 	uint64 private immutable subscriptionId;
-	bytes32 public immutable gasLane; // keyHash
+	bytes32 public immutable gasLane; 
 
 	uint32 public constant CALLBACK_GAS_LIMIT = 500000;
 	uint16 public constant REQUEST_CONFIRMATIONS = 3;
@@ -70,13 +75,14 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	// Roulette State Variables
 	uint256 public immutable interval;
 	uint256 public lastTimeStamp;
-	uint256 public immutable startGameValue; //= 10000000000000000; // 0.01 ETH
-	uint256 public immutable minimalBet; // = 1000000000; // 1 gwei
+	uint256 public immutable startGameValue; 
+	uint256 public immutable minimalBet; 
+	uint256 public immutable maximumBet; 
 	uint256 public moneyInTheBank;
 	uint256 public currentCasinoBalance;
 	uint256 public lastWinningNumber;
 	mapping(address => uint256) public playersBalances;
-
+	uint256 public allPlayersWinnings;
 	// Array of Bets
 	Bet[] public betsArr;
 
@@ -85,11 +91,12 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	event RequestedNumber(uint256 indexed requestId);
 	event GameStarted(uint256 indexed time);
 	event GameFinished(uint256 indexed winningNumber, uint256 indexed time);
+	event ReceivedDirectValue(address indexed msgSender, uint256 indexed msgValue);
 
 	/* Modifiers */
 	modifier onlyOwner() {
 		if (msg.sender != owner) {
-			revert(); // Roulette__NotAnOwner();
+			revert Roulette__NotAnOwner();
 		}
 		_;
 	}
@@ -99,7 +106,10 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	// Creates a bet for a player
 	function createBet(uint8 _betType, uint8[] calldata _numbers) public payable {
 		if (msg.value < minimalBet) {
-			revert(); //Roulette__PleaseSendMoreMoney();
+			revert Roulette__PleaseSendMoreMoney();
+		}
+		if (msg.value > maximumBet) {
+			revert Roulette__ExceedsMaximumBet();
 		}
 
 		Bet memory newBet = Bet({
@@ -133,7 +143,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		(bool upkeepNeeded, ) = checkUpkeep("");
 
 		if (!upkeepNeeded) {
-			revert(); //Roulette__UpkeepNotNeeded(moneyInTheBank, betsArr.length);
+			revert Roulette__UpkeepNotNeeded(moneyInTheBank, betsArr.length);
 		}
 
 		uint256 requestId = vrfCoordinator.requestRandomWords(
@@ -164,6 +174,10 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 					_betsArr[i].betType,
 					_betsArr[i].amount
 				);
+				allPlayersWinnings+= calcWin(
+					_betsArr[i].betType,
+					_betsArr[i].amount
+				);
 			} else {
 				tempAmount += _betsArr[i].amount;
 			}
@@ -178,44 +192,52 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	}
 
 	// Withdrawal for players
-	function withdrawPlayer() external nonReentrant {
-		if (msg.sender == address(0)) {
-			revert(); //Roulette__ZeroAddress();
-		}
+	function withdrawPlayer(uint256 _amount) external nonReentrant {
 		if (msg.sender.code.length > 0) {
-			revert(); //Roulette__IsContract();
+			revert Roulette__IsContract();
 		}
+		if (getCurrentContractBalance() < (currentCasinoBalance + _amount)) {
+			revert Roulette__PleaseWaitForLiquidity();
 
-		if (playersBalances[address(msg.sender)] > 1) {
-			(bool success, ) = msg.sender.call{value: playersBalances[address(msg.sender)]}("");
-			// (bool success, ) = msg.sender.call{value: 3000000000000000000}("");
+		}
+		if (playersBalances[address(msg.sender)] >= _amount) {
+			(bool success, ) = msg.sender.call{value: _amount}("");
+			
 
 			if (!success) {
-				revert(); //Roulette__TransactionFailed();
+				revert Roulette__TransactionFailed();
 			}
 		} else {
-			revert(); //Roulette__EmptyBalance();
+			revert Roulette__EmptyBalance();
 		}
-		playersBalances[address(msg.sender)] = 0;
+		playersBalances[address(msg.sender)] -= _amount;
+		allPlayersWinnings -= _amount;
 	}
 
 	// Withdrawal for Casino Owner
-	function withdrawOwner() external onlyOwner nonReentrant {
+	function withdrawOwner(uint256 _amount) external onlyOwner nonReentrant {
 		if (currentCasinoBalance < 1) {
-			revert(); //Roulette__CasinoIsEmpty();
+			revert Roulette__CasinoIsEmpty();
 		}
+		if (getCurrentContractBalance() < (allPlayersWinnings + _amount)) {
+			revert Roulette__PleaseWaitForLiquidity();
 
-		(bool success, ) = owner.call{value: currentCasinoBalance}("");
+		}
+		(bool success, ) = owner.call{value: _amount}("");
 
 		if (!success) {
-			revert(); //Roulette__TransactionFailed();
+			revert Roulette__TransactionFailed();
 		}
 
-		currentCasinoBalance = 0;
+		currentCasinoBalance -= _amount;
 	}
 
-	/* View(getter) Functions */
-	function checkBalance(address _player) public view returns (uint256 balance_) {
+	receive() external payable {
+        emit ReceivedDirectValue(msg.sender, msg.value);
+    }
+
+	/* View (getter) Functions */
+	function checkBalance(address _player) public view returns (uint256 playerBalance_) {
 		return playersBalances[_player];
 	}
 
@@ -227,7 +249,10 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		return startGameValue;
 	}
 
-	function getminimalBet() public view returns (uint256 minimalBet_) {
+	function getMaximumBet() public view returns (uint256 maximumBet_) {
+		return maximumBet;
+	}
+	function getMinimalBet() public view returns (uint256 minimalBet_) {
 		return minimalBet;
 	}
 
@@ -243,20 +268,13 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		return betsArr.length;
 	}
 
-	function getFirstPlayer() public view returns (Bet memory bet_) {
-		return betsArr[0];
-	}
-
-	function getSecondPlayer() public view returns (Bet memory bet_) {
-		return betsArr[1];
-	}
-
 	function getInterval() public view returns (uint256 interval_) {
         return interval;
     }
-	 function getLastTimeStamp() public view returns (uint256 lastTimeStamp_) {
+	function getLastTimeStamp() public view returns (uint256 lastTimeStamp_) {
         return lastTimeStamp;
     }
+	
 	function clearBetsArray(uint256 _length) internal {
 		for (uint256 i; i < _length; i += 1) {
 			betsArr.pop();
@@ -313,7 +331,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 				}
 
 				return won;
-				
+
 			} else if (_betType == 5) {
 				if (numbers[0] == 0) {
 					return won = (_rouletteWinNum % 3 == 1);

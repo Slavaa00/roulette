@@ -61,16 +61,20 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 				it("reverts when you don't pay enough", async () => {
 				await expect(roulette.createBet(0, [0], {value: 1})).to.be.reverted
 				})
+
+				it("reverts when you exceed max bet", async () => {
+				await expect(roulette.createBet(0, [0], {value: ethers.utils.parseEther("2")})).to.be.reverted
+				})
 				
 				it("creates a bet and adds it in the array of Bets with correct data", async () => {
 					
 					expect(await roulette.getNumberOfPlayers()).to.be.equal(10) // HERE equal2players
 					
-					const bet = await roulette.getFirstPlayer()
-					expect(bet[0]).to.be.equal(player.address)
-					expect(bet[1]).to.be.equal(ethers.utils.parseEther("1"))
-					expect(bet[2]).to.be.equal(5)
-					expect(bet[3].join()).to.be.equal("0")
+					// const bet = await roulette.getFirstPlayer()
+					// expect(bet[0]).to.be.equal(player.address)
+					// expect(bet[1]).to.be.equal(ethers.utils.parseEther("1"))
+					// expect(bet[2]).to.be.equal(5)
+					// expect(bet[3].join()).to.be.equal("0")
 
 					expect(await roulette.moneyInTheBank()).to.be.equal(BigInt(ethers.utils.parseEther("10"))) // HERE equal2players
 					
@@ -219,17 +223,17 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 				it("Receiving random number; checking all bets for winning; payout winning bets to mapping; returning losing bets amounts to casino; refreshing betsArr, lastWinningNumber and moneyInTheBank; starting new spin; allowing to withdraw for players and owner", async () => {
 					await expect(await roulette.getNumberOfPlayers()).to.be.equal(10) // HERE equal2players
 
-					const bet = await roulette.getFirstPlayer()
-					expect(bet[0]).to.be.equal(player.address)
-					expect(bet[1]).to.be.equal(ethers.utils.parseEther("1"))
-					expect(bet[2]).to.be.equal(5)
-					expect(bet[3].join()).to.be.equal("0")
+					// const bet = await roulette.getFirstPlayer()
+					// expect(bet[0]).to.be.equal(player.address)
+					// expect(bet[1]).to.be.equal(ethers.utils.parseEther("1"))
+					// expect(bet[2]).to.be.equal(5)
+					// expect(bet[3].join()).to.be.equal("0")
 
-					const bet2 = await roulette.getSecondPlayer()
-					expect(bet2[0]).to.be.equal(player.address)
-					expect(bet2[1]).to.be.equal(ethers.utils.parseEther("1"))
-					expect(bet2[2]).to.be.equal(9)
-					expect(bet2[3].join()).to.be.equal("1")
+					// const bet2 = await roulette.getSecondPlayer()
+					// expect(bet2[0]).to.be.equal(player.address)
+					// expect(bet2[1]).to.be.equal(ethers.utils.parseEther("1"))
+					// expect(bet2[2]).to.be.equal(9)
+					// expect(bet2[3].join()).to.be.equal("1")
 
 					const tx = await roulette.performUpkeep("0x")
 					const txRec = await tx.wait(1) 
@@ -249,7 +253,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 					expect(await roulette.lastWinningNumber()).to.be.equal(28)
 					
 					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("91")) //ethers.utils.parseEther("2")
-					 
+					expect(await roulette.allPlayersWinnings()).to.be.equal(ethers.utils.parseEther("91")) 
 
 					await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
 					await network.provider.request({ method: "evm_mine", params: [] })
@@ -272,7 +276,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
 					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("93")) //ethers.utils.parseEther("2")
-
+					expect(await roulette.allPlayersWinnings()).to.be.equal(ethers.utils.parseEther("93"))
 
 
 
@@ -285,14 +289,14 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					// await roulette.withdrawPlayer()
 
-					await expect(await roulette.withdrawPlayer()).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-93"), ethers.utils.parseEther("93")]);
+					await expect(await roulette.withdrawPlayer(ethers.utils.parseEther("93"))).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-93"), ethers.utils.parseEther("93")]);
 
 					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("0"))
 
 					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("18"))
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
 
-
+					expect(await roulette.allPlayersWinnings()).to.be.equal(ethers.utils.parseEther("0")) //ethers.utils.parseEther("2")
 
 
 
@@ -300,7 +304,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					// await roulette.connect(deployer).withdrawOwner()	
 
-					await expect(await roulette.connect(deployer).withdrawOwner()).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-1"), ethers.utils.parseEther("1")]);
+					await expect(await roulette.connect(deployer).withdrawOwner(ethers.utils.parseEther("1"))).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-1"), ethers.utils.parseEther("1")]);
 
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("0"))
 
@@ -345,9 +349,9 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("2")) //ethers.utils.parseEther("2")
 
-					await expect(await roulette.connect(deployer).withdrawOwner()).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-5"), ethers.utils.parseEther("5")]);
+					await expect(await roulette.connect(deployer).withdrawOwner(ethers.utils.parseEther("5"))).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-5"), ethers.utils.parseEther("5")]);
 
-					await expect(await roulette.withdrawPlayer()).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-2"), ethers.utils.parseEther("2")]);
+					await expect(await roulette.withdrawPlayer(ethers.utils.parseEther("2"))).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-2"), ethers.utils.parseEther("2")]);
 
 					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("16"))
 					
