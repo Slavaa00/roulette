@@ -170,14 +170,9 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 
 		for (uint256 i; i < _betsArr.length; i += 1) {
 			if (checkWinBet(_betsArr[i].betType, _betsArr[i].numbers, _rouletteWinNum)) {
-				playersBalances[_betsArr[i].player] += calcWin(
-					_betsArr[i].betType,
-					_betsArr[i].amount
-				);
-				allPlayersWinnings+= calcWin(
-					_betsArr[i].betType,
-					_betsArr[i].amount
-				);
+				uint256 _winAmount = calcWin(_betsArr[i].betType, _betsArr[i].amount);
+				playersBalances[_betsArr[i].player] += _winAmount;
+				allPlayersWinnings += _winAmount;
 			} else {
 				tempAmount += _betsArr[i].amount;
 			}
@@ -223,7 +218,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 			revert Roulette__PleaseWaitForLiquidity();
 
 		}
-		(bool success, ) = owner.call{value: _amount}("");
+		(bool success, ) = msg.sender.call{value: _amount}("");
 
 		if (!success) {
 			revert Roulette__TransactionFailed();
