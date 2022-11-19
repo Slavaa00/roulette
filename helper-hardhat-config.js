@@ -18,7 +18,7 @@ const networkConfig = {
 		numWords: "1",
 		startGameValue: ethers.utils.parseEther("0.01"),
 		minimalBet: "1000000000", // 1 gwei
-		maximumBet: ethers.utils.parseEther("1"),
+		maximumBet: ethers.utils.parseEther("100"),
 	},
 	5: {
 		name: "goerli",

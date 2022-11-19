@@ -63,7 +63,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 				})
 
 				it("reverts when you exceed max bet", async () => {
-				await expect(roulette.createBet(0, [0], {value: ethers.utils.parseEther("2")})).to.be.reverted
+				await expect(roulette.createBet(0, [0], {value: ethers.utils.parseEther("101")})).to.be.reverted
 				})
 				
 				it("creates a bet and adds it in the array of Bets with correct data", async () => {
@@ -285,18 +285,18 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
 
-					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("93")) //ethers.utils.parseEther("2")
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("93")) 
 
-					// await roulette.withdrawPlayer()
+					// // await roulette.withdrawPlayer()
 
-					await expect(await roulette.withdrawPlayer(ethers.utils.parseEther("93"))).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-93"), ethers.utils.parseEther("93")]);
+					await expect(await roulette.withdrawPlayer()).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-93"), ethers.utils.parseEther("93")]);
 
 					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("0"))
 
 					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("18"))
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("1"))
 
-					expect(await roulette.allPlayersWinnings()).to.be.equal(ethers.utils.parseEther("0")) //ethers.utils.parseEther("2")
+					expect(await roulette.allPlayersWinnings()).to.be.equal(ethers.utils.parseEther("0")) 
 
 
 
@@ -304,7 +304,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					// await roulette.connect(deployer).withdrawOwner()	
 
-					await expect(await roulette.connect(deployer).withdrawOwner(ethers.utils.parseEther("1"))).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-1"), ethers.utils.parseEther("1")]);
+					await expect(await roulette.connect(deployer).withdrawOwner()).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-1"), ethers.utils.parseEther("1")]);
 
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("0"))
 
@@ -315,12 +315,12 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 
 					// 3rd SPIN
-					await roulette.createBet(8, [1], {value: ethers.utils.parseEther("1")}) // 2
-					await roulette.createBet(7, [0], {value: ethers.utils.parseEther("1")}) // lost
-					await roulette.createBet(6, [0], {value: ethers.utils.parseEther("1")}) // lost
-					await roulette.createBet(6, [1], {value: ethers.utils.parseEther("1")}) // lost
-					await roulette.createBet(5, [1], {value: ethers.utils.parseEther("1")}) // lost
-					await roulette.createBet(5, [2], {value: ethers.utils.parseEther("1")}) // lost
+					await roulette.createBet(8, [1], {value: ethers.utils.parseEther("100")}) // 2
+					await roulette.createBet(7, [0], {value: ethers.utils.parseEther("5")}) // lost
+					await roulette.createBet(6, [0], {value: ethers.utils.parseEther("5")}) // lost
+					await roulette.createBet(6, [1], {value: ethers.utils.parseEther("5")}) // lost
+					await roulette.createBet(5, [1], {value: ethers.utils.parseEther("5")}) // lost
+					await roulette.createBet(5, [2], {value: ethers.utils.parseEther("5")}) // lost
 			
 					await expect(await roulette.getNumberOfPlayers()).to.be.equal(6)
 
@@ -344,16 +344,22 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 					expect(await roulette.moneyInTheBank()).to.be.equal(0)
 
 
-					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("5"))
+					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("142"))
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("25"))
 
 
-					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("2")) //ethers.utils.parseEther("2")
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("200")) 
 
-					await expect(await roulette.connect(deployer).withdrawOwner(ethers.utils.parseEther("5"))).to.changeEtherBalances([rouletteContract, deployer], [ethers.utils.parseEther("-5"), ethers.utils.parseEther("5")]);
+					await expect(roulette.connect(deployer).withdrawOwner()).to.be.revertedWithCustomError(roulette,"Roulette__PleaseWaitForLiquidity")
 
-					await expect(await roulette.withdrawPlayer(ethers.utils.parseEther("2"))).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-2"), ethers.utils.parseEther("2")]);
+					await expect(roulette.withdrawPlayer()).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("-142"), ethers.utils.parseEther("142")]);
 
-					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("16"))
+					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("0"))
+
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("0"))
+
+					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("25"))
 					
 				})
 

@@ -187,44 +187,65 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	}
 
 	// Withdrawal for players
-	function withdrawPlayer(uint256 _amount) external nonReentrant {
+	function withdrawPlayer() external nonReentrant {
 		if (msg.sender.code.length > 0) {
 			revert Roulette__IsContract();
 		}
-		if (getCurrentContractBalance() < (currentCasinoBalance + _amount)) {
-			revert Roulette__PleaseWaitForLiquidity();
-
+		if (playersBalances[address(msg.sender)] < 1) {
+			revert Roulette__EmptyBalance();
 		}
-		if (playersBalances[address(msg.sender)] >= _amount) {
-			(bool success, ) = msg.sender.call{value: _amount}("");
-			
+
+		uint256 _availableAmount = playersBalances[address(msg.sender)];
+		
+		if (getCurrentContractBalance() >= _availableAmount) {
+
+			(bool success, ) = msg.sender.call{value: _availableAmount}("");
 
 			if (!success) {
 				revert Roulette__TransactionFailed();
 			}
+
+			playersBalances[address(msg.sender)] = 0;
+
+			allPlayersWinnings -= _availableAmount;
+
 		} else {
-			revert Roulette__EmptyBalance();
+
+			(bool success, ) = msg.sender.call{value: getCurrentContractBalance()}("");
+
+			if (!success) {
+				revert Roulette__TransactionFailed();
+			}
+
+			playersBalances[address(msg.sender)] -= (_availableAmount - getCurrentContractBalance());
+
+			allPlayersWinnings -= getCurrentContractBalance();
 		}
-		playersBalances[address(msg.sender)] -= _amount;
-		allPlayersWinnings -= _amount;
+		
+		
 	}
 
 	// Withdrawal for Casino Owner
-	function withdrawOwner(uint256 _amount) external onlyOwner nonReentrant {
+	function withdrawOwner() external onlyOwner nonReentrant {
 		if (currentCasinoBalance < 1) {
 			revert Roulette__CasinoIsEmpty();
 		}
-		if (getCurrentContractBalance() < (allPlayersWinnings + _amount)) {
-			revert Roulette__PleaseWaitForLiquidity();
+		bool _enoughLiquidity = ((getCurrentContractBalance() - currentCasinoBalance) >= allPlayersWinnings);
 
-		}
-		(bool success, ) = msg.sender.call{value: _amount}("");
+		if (_enoughLiquidity) {
+			(bool success, ) = msg.sender.call{value: currentCasinoBalance}("");
 
-		if (!success) {
+			if (!success) {
 			revert Roulette__TransactionFailed();
-		}
+			}
 
-		currentCasinoBalance -= _amount;
+			currentCasinoBalance = 0;
+		} else {
+			revert Roulette__PleaseWaitForLiquidity();
+		}
+		
+		
+		
 	}
 
 	receive() external payable {
