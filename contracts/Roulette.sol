@@ -9,8 +9,6 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 
 import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
-
-
 /* Errors */
 error Roulette__PleaseSendMoreMoney();
 error Roulette__ExceedsMaximumBet();
@@ -25,13 +23,12 @@ error Roulette__PleaseWaitForLiquidity();
 error Roulette__NotPossibleNumbersArrayLength();
 error Roulette__NotPossibleBet();
 
-
 /**@title Roulette contract
  * @author Vyacheslav Pyzhov
  * @dev This implements the Chainlink VRF Version 2
  */
 
-contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleInterface {
+contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInterface {
 	constructor(
 		address _vrfCoordinatorV2,
 		uint64 _subscriptionId,
@@ -68,7 +65,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	// Chainlink VRF Variables
 	VRFCoordinatorV2Interface private immutable vrfCoordinator;
 	uint64 private immutable subscriptionId;
-	bytes32 public immutable gasLane; 
+	bytes32 public immutable gasLane;
 
 	uint32 public constant CALLBACK_GAS_LIMIT = 500000;
 	uint16 public constant REQUEST_CONFIRMATIONS = 3;
@@ -77,9 +74,9 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	// Roulette State Variables
 	uint256 public immutable interval;
 	uint256 public lastTimeStamp;
-	uint256 public immutable startGameValue; 
-	uint256 public immutable minimalBet; 
-	uint256 public immutable maximumBet; 
+	uint256 public immutable startGameValue;
+	uint256 public immutable minimalBet;
+	uint256 public immutable maximumBet;
 	uint256 public moneyInTheBank;
 	uint256 public currentCasinoBalance;
 	uint256 public lastWinningNumber;
@@ -166,7 +163,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 
 	// Oracle invokes this function
 	function fulfillRandomWords(
-		uint256, /*_requestId*/
+		uint256 /*_requestId*/,
 		uint256[] memory _randomWords
 	) internal override {
 		uint256 _rouletteWinNum = (_randomWords[0] % (37));
@@ -205,9 +202,8 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		uint256 _availableAmount = playersBalances[address(msg.sender)];
 
 		uint256 _contractBalance = getCurrentContractBalance();
-		
-		if (_contractBalance >= _availableAmount) {
 
+		if (_contractBalance >= _availableAmount) {
 			(bool success, ) = msg.sender.call{value: _availableAmount}("");
 
 			if (!success) {
@@ -217,9 +213,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 			playersBalances[address(msg.sender)] = 0;
 
 			allPlayersWinnings -= _availableAmount;
-
 		} else {
-
 			(bool success, ) = msg.sender.call{value: _contractBalance}("");
 
 			if (!success) {
@@ -230,8 +224,6 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 
 			allPlayersWinnings -= _contractBalance;
 		}
-		
-		
 	}
 
 	// Withdrawal for Casino Owner
@@ -239,27 +231,25 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		if (currentCasinoBalance < 1) {
 			revert Roulette__CasinoIsEmpty();
 		}
-		bool _enoughLiquidity = ((getCurrentContractBalance() - currentCasinoBalance) >= allPlayersWinnings);
+		bool _enoughLiquidity = ((getCurrentContractBalance() - currentCasinoBalance) >=
+			allPlayersWinnings);
 
 		if (_enoughLiquidity) {
 			(bool success, ) = msg.sender.call{value: currentCasinoBalance}("");
 
 			if (!success) {
-			revert Roulette__TransactionFailed();
+				revert Roulette__TransactionFailed();
 			}
 
 			currentCasinoBalance = 0;
 		} else {
 			revert Roulette__PleaseWaitForLiquidity();
 		}
-		
-		
-		
 	}
 
 	receive() external payable {
-        emit ReceivedDirectValue(msg.sender, msg.value);
-    }
+		emit ReceivedDirectValue(msg.sender, msg.value);
+	}
 
 	/* View (getter) Functions */
 	function checkBalance(address _player) public view returns (uint256 playerBalance_) {
@@ -277,6 +267,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	function getMaximumBet() public view returns (uint256 maximumBet_) {
 		return maximumBet;
 	}
+
 	function getMinimalBet() public view returns (uint256 minimalBet_) {
 		return minimalBet;
 	}
@@ -294,12 +285,13 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	}
 
 	function getInterval() public view returns (uint256 interval_) {
-        return interval;
-    }
+		return interval;
+	}
+
 	function getLastTimeStamp() public view returns (uint256 lastTimeStamp_) {
-        return lastTimeStamp;
-    }
-	
+		return lastTimeStamp;
+	}
+
 	function clearBetsArray(uint256 _length) internal {
 		for (uint256 i; i < _length; i += 1) {
 			betsArr.pop();
@@ -308,10 +300,20 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 
 	/* Pure Functions */
 	//Possible numbers array length
-	function possibleNumbersLength(uint8 _betType, uint256 _numbersLength) internal pure returns (bool correctLength_) {
+	function possibleNumbersLength(
+		uint8 _betType,
+		uint256 _numbersLength
+	) internal pure returns (bool correctLength_) {
 		bool _correctLength;
 
-		if ((_betType == 9 || _betType == 8 || _betType == 7 || _betType == 6 || _betType == 5 || _betType == 0) && (_numbersLength == 1)) {
+		if (
+			(_betType == 9 ||
+				_betType == 8 ||
+				_betType == 7 ||
+				_betType == 6 ||
+				_betType == 5 ||
+				_betType == 0) && (_numbersLength == 1)
+		) {
 			return !_correctLength;
 		}
 		if (_betType == 4 && (_numbersLength == 6)) {
@@ -326,78 +328,117 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		if (_betType == 1 && (_numbersLength == 2)) {
 			return !_correctLength;
 		}
-	
+
 		return _correctLength;
 	}
 
 	//Possible real roulette bet
-	function possibleBet(uint8 _betType, uint8[] calldata _numbers) internal pure returns (bool correctBet_) {
+	function possibleBet(
+		uint8 _betType,
+		uint8[] calldata _numbers
+	) internal pure returns (bool correctBet_) {
 		bool _correctBet;
 		uint8 _leftBorder = _numbers[0];
 		uint8 _rightBorder = _numbers[_numbers.length - 1];
 
-		if ((_betType == 9 || _betType == 8 || _betType == 7 || _betType == 6 || _betType == 5 || _betType == 0)) {
+		if (
+			(_betType == 9 ||
+				_betType == 8 ||
+				_betType == 7 ||
+				_betType == 6 ||
+				_betType == 5 ||
+				_betType == 0)
+		) {
 			return !_correctBet;
 		}
-		if ((_betType == 4) && ((_leftBorder % 3 == 1) && (_leftBorder % 2 == 1)) && (arrInc(_betType, _numbers))) {
+		if (
+			(_betType == 4) &&
+			((_leftBorder % 3 == 1) && (_leftBorder % 2 == 1)) &&
+			(arrInc(_betType, _numbers))
+		) {
 			return !_correctBet;
 		}
 
-
-		if ((_betType == 3) && (_leftBorder != 0) && (_leftBorder % 3 == 1 || _leftBorder % 3 == 2) && (_rightBorder < 37) && (arrInc(_betType, _numbers))) {
+		if (
+			(_betType == 3) &&
+			(_leftBorder != 0) &&
+			(_leftBorder % 3 == 1 || _leftBorder % 3 == 2) &&
+			(_rightBorder < 37) &&
+			(arrInc(_betType, _numbers))
+		) {
 			return !_correctBet;
-		} else if ((_betType == 3) && (_leftBorder != 0) && (_leftBorder % 3 == 1 || _leftBorder % 3 == 2) && (_rightBorder < 37) && (!arrInc(_betType, _numbers))) {
-        	return _correctBet;
-    	} else if ((_betType == 3) && (_leftBorder == 0)) {
+		} else if (
+			(_betType == 3) &&
+			(_leftBorder != 0) &&
+			(_leftBorder % 3 == 1 || _leftBorder % 3 == 2) &&
+			(_rightBorder < 37) &&
+			(!arrInc(_betType, _numbers))
+		) {
+			return _correctBet;
+		} else if ((_betType == 3) && (_leftBorder == 0)) {
 			if ((_numbers[1] == 1) && (_numbers[2] == 2) && (_rightBorder == 3)) {
 				return !_correctBet;
 			}
 			return _correctBet;
 		}
-		
 
-
-		if ((_betType == 2) && (_leftBorder != 0) && (_leftBorder % 3 == 1) && (arrInc(_betType, _numbers))) {
+		if (
+			(_betType == 2) &&
+			(_leftBorder != 0) &&
+			(_leftBorder % 3 == 1) &&
+			(arrInc(_betType, _numbers))
+		) {
 			return !_correctBet;
 		} else if ((_betType == 2) && (_leftBorder == 0)) {
-			if (((_numbers[1] == 1) && (_rightBorder == 2)) || ((_numbers[1] == 2) && (_rightBorder == 3))) {
+			if (
+				((_numbers[1] == 1) && (_rightBorder == 2)) ||
+				((_numbers[1] == 2) && (_rightBorder == 3))
+			) {
 				return !_correctBet;
 			}
 			return _correctBet;
 		}
 
-		if (((_betType == 1) && (_leftBorder != 0 )) && (((_rightBorder < 37 && _rightBorder > 1) && (_rightBorder -  _leftBorder == 1))) || (((_rightBorder < 37 && _rightBorder > 3) && (_rightBorder -  _leftBorder == 3)))) {
+		if (
+			(((_betType == 1) && (_leftBorder != 0)) &&
+				(((_rightBorder < 37 && _rightBorder > 1) && (_rightBorder - _leftBorder == 1)))) ||
+			(((_rightBorder < 37 && _rightBorder > 3) && (_rightBorder - _leftBorder == 3)))
+		) {
 			return !_correctBet;
-		} else if ((_betType == 1) && (_leftBorder == 0 )) {
+		} else if ((_betType == 1) && (_leftBorder == 0)) {
 			if ((_rightBorder == 1) || (_rightBorder == 2) || (_rightBorder == 3)) {
 				return !_correctBet;
 			}
 			return _correctBet;
 		}
-	
+
 		return _correctBet;
 	}
 
 	//Array values are incrementing check
-	function arrInc(uint8 _betType, uint8[] calldata _numbers) internal pure returns (bool incrementing_) {
+	function arrInc(
+		uint8 _betType,
+		uint8[] calldata _numbers
+	) internal pure returns (bool incrementing_) {
 		bool _incrementing = true;
 		if (_betType == 3) {
-			if (!((_numbers[0] == _numbers[1] - 1) && (_numbers[1] == _numbers[2] - 2) && (_numbers[2] == _numbers[3] - 1))) {
+			if (
+				!((_numbers[0] == _numbers[1] - 1) &&
+					(_numbers[1] == _numbers[2] - 2) &&
+					(_numbers[2] == _numbers[3] - 1))
+			) {
 				return !_incrementing;
 			}
 
 			return _incrementing;
-
 		} else if (_betType != 3) {
-			for (uint256 i; i < _numbers.length - 1; i+=1) {
-			
+			for (uint256 i; i < _numbers.length - 1; i += 1) {
 				if (!(_numbers[i] == _numbers[i + 1] - 1)) {
 					return !_incrementing;
 				}
 			}
 			return _incrementing;
 		}
-		
 
 		return !_incrementing;
 	}
@@ -438,12 +479,9 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 			return won = (_betType == 0 && numbers[0] == 0);
 			/* bet on 0 */
 		} else {
-
 			if (_betType == 0) {
 				return won = (numbers[0] == _rouletteWinNum); /* bet on number */
-			} 
-			
-			else if (_betType == 1 || _betType == 2 || _betType == 3 || _betType == 4) {
+			} else if (_betType == 1 || _betType == 2 || _betType == 3 || _betType == 4) {
 				for (uint8 i; i < numbers.length; i += 1) {
 					if (numbers[i] == _rouletteWinNum) {
 						return !won;
@@ -451,7 +489,6 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 				}
 
 				return won;
-
 			} else if (_betType == 5) {
 				if (numbers[0] == 0) {
 					return won = (_rouletteWinNum % 3 == 1);
