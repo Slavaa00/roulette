@@ -22,6 +22,8 @@ error Roulette__NotAnOwner();
 error Roulette__CasinoIsEmpty();
 error Roulette__EmptyBalance();
 error Roulette__PleaseWaitForLiquidity();
+error Roulette__NotPossibleNumbersArrayLength();
+error Roulette__NotPossibleBet();
 
 
 /**@title Roulette contract
@@ -111,7 +113,12 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		if (msg.value > maximumBet) {
 			revert Roulette__ExceedsMaximumBet();
 		}
-
+		if (!possibleNumbersLength(_betType, _numbers.length)) {
+			revert Roulette__NotPossibleNumbersArrayLength();
+		}
+		if (!possibleBet(_betType, _numbers)) {
+			revert Roulette__NotPossibleBet();
+		}
 		Bet memory newBet = Bet({
 			player: msg.sender,
 			amount: msg.value,
@@ -300,6 +307,101 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 	}
 
 	/* Pure Functions */
+	//Possible numbers array length
+	function possibleNumbersLength(uint8 _betType, uint256 _numbersLength) internal pure returns (bool correctLength_) {
+		bool _correctLength;
+
+		if ((_betType == 9 || _betType == 8 || _betType == 7 || _betType == 6 || _betType == 5 || _betType == 0) && (_numbersLength == 1)) {
+			return !_correctLength;
+		}
+		if (_betType == 4 && (_numbersLength == 6)) {
+			return !_correctLength;
+		}
+		if (_betType == 3 && (_numbersLength == 4)) {
+			return !_correctLength;
+		}
+		if (_betType == 2 && (_numbersLength == 3)) {
+			return !_correctLength;
+		}
+		if (_betType == 1 && (_numbersLength == 2)) {
+			return !_correctLength;
+		}
+	
+		return _correctLength;
+	}
+
+	//Possible real roulette bet
+	function possibleBet(uint8 _betType, uint8[] calldata _numbers) internal pure returns (bool correctBet_) {
+		bool _correctBet;
+		uint8 _leftBorder = _numbers[0];
+		uint8 _rightBorder = _numbers[_numbers.length - 1];
+
+		if ((_betType == 9 || _betType == 8 || _betType == 7 || _betType == 6 || _betType == 5 || _betType == 0)) {
+			return !_correctBet;
+		}
+		if ((_betType == 4) && ((_leftBorder % 3 == 1) && (_leftBorder % 2 == 1)) && (arrInc(_betType, _numbers))) {
+			return !_correctBet;
+		}
+
+
+		if ((_betType == 3) && (_leftBorder != 0) && (_leftBorder % 3 == 1 || _leftBorder % 3 == 2) && (_rightBorder < 37) && (arrInc(_betType, _numbers))) {
+			return !_correctBet;
+		} else if ((_betType == 3) && (_leftBorder != 0) && (_leftBorder % 3 == 1 || _leftBorder % 3 == 2) && (_rightBorder < 37) && (!arrInc(_betType, _numbers))) {
+        	return _correctBet;
+    	} else if ((_betType == 3) && (_leftBorder == 0)) {
+			if ((_numbers[1] == 1) && (_numbers[2] == 2) && (_rightBorder == 3)) {
+				return !_correctBet;
+			}
+			return _correctBet;
+		}
+		
+
+
+		if ((_betType == 2) && (_leftBorder != 0) && (_leftBorder % 3 == 1) && (arrInc(_betType, _numbers))) {
+			return !_correctBet;
+		} else if ((_betType == 2) && (_leftBorder == 0)) {
+			if (((_numbers[1] == 1) && (_rightBorder == 2)) || ((_numbers[1] == 2) && (_rightBorder == 3))) {
+				return !_correctBet;
+			}
+			return _correctBet;
+		}
+
+		if (((_betType == 1) && (_leftBorder != 0 )) && (((_rightBorder < 37 && _rightBorder > 1) && (_rightBorder -  _leftBorder == 1))) || (((_rightBorder < 37 && _rightBorder > 3) && (_rightBorder -  _leftBorder == 3)))) {
+			return !_correctBet;
+		} else if ((_betType == 1) && (_leftBorder == 0 )) {
+			if ((_rightBorder == 1) || (_rightBorder == 2) || (_rightBorder == 3)) {
+				return !_correctBet;
+			}
+			return _correctBet;
+		}
+	
+		return _correctBet;
+	}
+
+	//Array values are incrementing check
+	function arrInc(uint8 _betType, uint8[] calldata _numbers) internal pure returns (bool incrementing_) {
+		bool _incrementing = true;
+		if (_betType == 3) {
+			if (!((_numbers[0] == _numbers[1] - 1) && (_numbers[1] == _numbers[2] - 2) && (_numbers[2] == _numbers[3] - 1))) {
+				return !_incrementing;
+			}
+
+			return _incrementing;
+
+		} else if (_betType != 3) {
+			for (uint256 i; i < _numbers.length - 1; i+=1) {
+			
+				if (!(_numbers[i] == _numbers[i + 1] - 1)) {
+					return !_incrementing;
+				}
+			}
+			return _incrementing;
+		}
+		
+
+		return !_incrementing;
+	}
+
 	//Calculates winning amount if bet has won
 	function calcWin(uint8 _betType, uint256 _amount) internal pure returns (uint256 amount_) {
 		if (_betType == 0) {

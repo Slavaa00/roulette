@@ -86,6 +86,14 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 						"BetCreated"
 					)
 				})
+			
+				it("reverts wrong numbers length", async () => {
+					await expect(roulette.createBet(9, [0,1], {value: ethers.utils.parseEther("1")})).to.be.reverted
+				})
+				
+				it("reverts impossible bet", async () => {
+					await expect(roulette.createBet(3, [1,2,3,4], {value: ethers.utils.parseEther("1")})).to.be.reverted
+				})
 
 			})
 
