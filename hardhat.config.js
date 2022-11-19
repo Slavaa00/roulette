@@ -4,8 +4,7 @@ require("hardhat-deploy")
 require("hardhat-contract-sizer")
 require("dotenv").config()
 
-const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL 
-	
+const GOERLI_RPC_URL = process.env.GOERLI_RPC_URL
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY
 

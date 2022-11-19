@@ -196,8 +196,10 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 		}
 
 		uint256 _availableAmount = playersBalances[address(msg.sender)];
+
+		uint256 _contractBalance = getCurrentContractBalance();
 		
-		if (getCurrentContractBalance() >= _availableAmount) {
+		if (_contractBalance >= _availableAmount) {
 
 			(bool success, ) = msg.sender.call{value: _availableAmount}("");
 
@@ -211,15 +213,15 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard , AutomationCompatibleIn
 
 		} else {
 
-			(bool success, ) = msg.sender.call{value: getCurrentContractBalance()}("");
+			(bool success, ) = msg.sender.call{value: _contractBalance}("");
 
 			if (!success) {
 				revert Roulette__TransactionFailed();
 			}
 
-			playersBalances[address(msg.sender)] -= (_availableAmount - getCurrentContractBalance());
+			playersBalances[address(msg.sender)] -= _contractBalance;
 
-			allPlayersWinnings -= getCurrentContractBalance();
+			allPlayersWinnings -= _contractBalance;
 		}
 		
 		

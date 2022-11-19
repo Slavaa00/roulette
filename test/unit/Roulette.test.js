@@ -357,7 +357,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					expect(await roulette.getCurrentContractBalance()).to.be.equal(ethers.utils.parseEther("0"))
 
-					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("0"))
+					expect(await roulette.checkBalance(player.address)).to.be.equal(ethers.utils.parseEther("58"))
 
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("25"))
 					
