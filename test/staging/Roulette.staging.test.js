@@ -9,7 +9,7 @@ developmentChains.includes(network.name)
 
 			beforeEach(async function () {
 				deployer = (await getNamedAccounts()).deployer
-				roulette = await ethers.getContract("roulette", deployer)
+				roulette = await ethers.getContract("Roulette", deployer)
 				
 			})
 
@@ -25,27 +25,28 @@ developmentChains.includes(network.name)
 						// Just in case the blockchain moves REALLY fast
 						roulette.once("GameFinished", async () => {
 							console.log("Spin completed")
-							try {
+						
+								try {
+								const moneyInTheBank = await roulette.getMoneyInTheBank();
+								const endingTimeStamp = await roulette.getLastTimeStamp();
 								
-								const moneyInTheBank = await roulette.getMoneyInTheBank()
-								const endingTimeStamp = await roulette.getLastTimeStamp()
-								
-								assert.equal(moneyInTheBank, 0)
+								assert.equal(moneyInTheBank, 0);
 								// assert.equal(
 								// 	winnerEndingBalance.toString(),
 								// 	winnerStartingBalance.add(raffleEntranceFee).toString()
 								// )
-								assert(endingTimeStamp > startingTimeStamp)
-								resolve()
-							} catch (error) {
+								assert(endingTimeStamp > startingTimeStamp);
+								resolve();
+							}
+							catch (error) {
 								console.log(error)
-								reject(error)
+                              	reject(error)
 							}
 						})
 					
 						console.log("Entering Casino...")
 
-						const tx = await roulette.createBet(5, [0], {value: ethers.utils.parseEther("1")}) 
+						const tx = await roulette.createBet(5, [0], {value: ethers.utils.parseEther("0.000000001")}) 
 						await tx.wait(1)
 						
 						// const winnerStartingBalance = await accounts[0].getBalance()
