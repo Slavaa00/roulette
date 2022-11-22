@@ -250,7 +250,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 
 	//Selfdestruct
 	function ciao() external onlyOwner {
-		if (allPlayersWinnings > 0) {
+		if (allPlayersWinnings > 0 || currentCasinoBalance < 1) {
 			revert Roulette__WaitForAllPlayersWithdraws();
 		} else {
 			selfdestruct(payable(msg.sender));
