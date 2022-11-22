@@ -22,6 +22,7 @@ error Roulette__EmptyBalance();
 error Roulette__PleaseWaitForLiquidity();
 error Roulette__NotPossibleNumbersArrayLength();
 error Roulette__NotPossibleBet();
+error Roulette__WaitForAllPlayersWithdraws();
 
 /**@title Roulette contract
  * @author Vyacheslav Pyzhov
@@ -244,6 +245,15 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 			currentCasinoBalance = 0;
 		} else {
 			revert Roulette__PleaseWaitForLiquidity();
+		}
+	}
+
+	//Selfdestruct
+	function ciao() external onlyOwner {
+		if (allPlayersWinnings > 0) {
+			revert Roulette__WaitForAllPlayersWithdraws();
+		} else {
+			selfdestruct(payable(msg.sender));
 		}
 	}
 
