@@ -369,6 +369,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 
 					expect(await roulette.currentCasinoBalance()).to.be.equal(ethers.utils.parseEther("25"))
 					
+					expect(roulette.connect(deployer).ciao()).to.be.reverted
 				})
 
 				
