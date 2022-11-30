@@ -203,7 +203,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
 				// TEST FOR NOT ENOUGH TIME PASSED
 
 				it("returns false if enough time hasn't passed", async () => {
-					await network.provider.send("evm_increaseTime", [interval.toNumber() - 15]) // use a higher number here if this test fails
+					await network.provider.send("evm_increaseTime", [interval.toNumber() - 16]) // use a higher number here if this test fails
 					await network.provider.request({ method: "evm_mine", params: [] })
 
 					const { upkeepNeeded } = await roulette.callStatic.checkUpkeep("0x") // upkeepNeeded = (timePassed && hasPlayers && hasStartGameValue);
