@@ -23,6 +23,7 @@ error Roulette__PleaseWaitForLiquidity();
 error Roulette__NotPossibleNumbersArrayLength();
 error Roulette__NotPossibleBet();
 error Roulette__WaitForAllPlayersWithdraws();
+error Roulette__NotEnoughBalance();
 
 /**@title Roulette contract
  * @author Vyacheslav Pyzhov
@@ -58,7 +59,10 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 		uint8 betType; // 0: oneNumber, 1: twoNumbers, 2: threeNumbers, 3: fourNumbers, 4: sixNumbers, 5: column, 6: dozen 7: eighteen, 8: modulus, 9: color:
 		uint8[] numbers;
 	}
-
+	enum RouletteState {
+		OPEN,
+		SPINNING
+	}
 	/* State variables */
 	//Owner
 	address public immutable owner;
@@ -73,6 +77,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 	uint32 public constant NUM_WORDS = 1;
 
 	// Roulette State Variables
+	RouletteState public rouletteState;
 	uint256 public immutable interval;
 	uint256 public lastTimeStamp;
 	uint256 public immutable startGameValue;
@@ -131,15 +136,56 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 		emit BetCreated(newBet, block.timestamp);
 	}
 
+	// Creates a bet spending deposit for a player
+	function createBetSpendDeposit(
+		uint8 _betType,
+		uint8[] calldata _numbers,
+		uint256 _amount
+	) public {
+		if (_amount > playersBalances[address(msg.sender)]) {
+			revert Roulette__NotEnoughBalance();
+		}
+		if (_amount < minimalBet) {
+			revert Roulette__PleaseSendMoreMoney();
+		}
+		if (_amount > maximumBet) {
+			revert Roulette__ExceedsMaximumBet();
+		}
+		if (!possibleNumbersLength(_betType, _numbers.length)) {
+			revert Roulette__NotPossibleNumbersArrayLength();
+		}
+		if (!possibleBet(_betType, _numbers)) {
+			revert Roulette__NotPossibleBet();
+		}
+
+		playersBalances[address(msg.sender)] -= _amount;
+
+		allPlayersWinnings -= _amount;
+
+		Bet memory newBet = Bet({
+			player: msg.sender,
+			amount: _amount,
+			betType: _betType,
+			numbers: _numbers
+		});
+
+		betsArr.push(newBet);
+
+		moneyInTheBank += _amount;
+
+		emit BetCreated(newBet, block.timestamp);
+	}
+
 	// Checks for minimal amount and bets existing
 	function checkUpkeep(
 		bytes memory /* checkData */
 	) public view override returns (bool upkeepNeeded, bytes memory /* performData */) {
+		bool isOpen = rouletteState == RouletteState.OPEN;
 		bool hasPlayers = betsArr.length > 0;
 		bool hasStartGameValue = moneyInTheBank >= startGameValue;
 		bool timePassed = ((block.timestamp - lastTimeStamp) > interval);
 
-		upkeepNeeded = (timePassed && hasPlayers && hasStartGameValue);
+		upkeepNeeded = (isOpen && hasPlayers && hasStartGameValue && timePassed);
 		return (upkeepNeeded, "0x0");
 	}
 
@@ -150,6 +196,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 		if (!upkeepNeeded) {
 			revert Roulette__UpkeepNotNeeded(moneyInTheBank, betsArr.length);
 		}
+		rouletteState == RouletteState.SPINNING;
 
 		uint256 requestId = vrfCoordinator.requestRandomWords(
 			gasLane,
@@ -188,7 +235,14 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 
 		clearBetsArray(betsArr.length);
 		lastTimeStamp = block.timestamp;
+		rouletteState == RouletteState.OPEN;
 		emit GameFinished(_rouletteWinNum, block.timestamp);
+	}
+
+	//Deposit
+	function deposit() external payable {
+		playersBalances[address(msg.sender)] += msg.value;
+		allPlayersWinnings += msg.value;
 	}
 
 	// Withdrawal for players
@@ -257,11 +311,26 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 		}
 	}
 
+	
 	receive() external payable {
 		emit ReceivedDirectValue(msg.sender, msg.value);
 	}
 
+	fallback() external payable {
+		(bool success, bytes memory data) = address(this).call{value: msg.value}(
+			abi.encodeWithSignature("createBet(uint8,uint8[])", 0, [0])
+		);
+
+		if (!success) {
+			revert Roulette__TransactionFailed();
+		}
+	}
+	
 	/* View (getter) Functions */
+	function getArrayOfBets() public view returns (Bet[] memory bets_) {
+		return betsArr;
+	}
+
 	function checkBalance(address _player) public view returns (uint256 playerBalance_) {
 		return playersBalances[_player];
 	}

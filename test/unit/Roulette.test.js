@@ -55,6 +55,78 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
        
 				})
 			})
+			describe("deposit, betsArr, ciao, fallback, receive, createBetSpendDeposit", function () {
+				
+				it("deposits money to player's balance, increasing allPlayersWinnings and allow to createBetSpendDeposit", async () => {
+					
+					
+					await expect(await roulette.deposit({value: ethers.utils.parseEther("1")})).to.changeEtherBalances([rouletteContract, player], [ethers.utils.parseEther("1"), ethers.utils.parseEther("-1")]);
+					
+					assert.equal(await roulette.allPlayersWinnings(), ethers.utils.parseEther("1").toString())
+					
+					
+					
+       
+				})
+				
+
+				// it('should invoke the fallback function', async () => {
+				// 	await player.sendTransaction({
+				// 		to: rouletteContract.address,
+				// 		data: "0x12",
+				// 		value: ethers.utils.parseEther("1").toString()
+				// 	});
+					
+
+				// 	expect(await roulette.betsArr().length).to.be.equal(11)
+
+				// })
+
+				it("createBetSpendDeposit", async () => {
+					await roulette.deposit({value: ethers.utils.parseEther("1")})
+					expect(await roulette.playersBalances(player.address)).to.be.equal(ethers.utils.parseEther("1"))
+
+					await roulette.createBetSpendDeposit(0,
+						[0],
+						1000000000)
+
+
+					const betsArr = await roulette.getArrayOfBets()
+
+					expect(betsArr.length).to.be.equal(11)
+		
+       
+				})
+
+				it("changes player's balance", async () => {
+					await roulette.deposit({value: ethers.utils.parseEther("1")})
+					
+					
+					expect(await roulette.playersBalances(player.address)).to.be.equal(ethers.utils.parseEther("1"))
+					
+		
+       
+				})
+				
+
+				it("returns Array Of Bets", async () => {
+					const betsArr = await roulette.getArrayOfBets()
+
+			
+					assert.equal(betsArr[0][0], player.address)
+					assert.equal(betsArr[0][1].toString(), ethers.utils.parseEther("1").toString())
+					assert.equal(betsArr[0][2], 5)
+					assert.equal(betsArr[0][3], 0)
+
+					assert.equal(betsArr[1][0], player.address)
+					assert.equal(betsArr[1][1].toString(), ethers.utils.parseEther("1").toString())
+					assert.equal(betsArr[1][2], 9)
+					assert.equal(betsArr[1][3], 1)
+	
+		
+       
+				})
+			})
 
 			describe("createBet", function () {
 
