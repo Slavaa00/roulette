@@ -304,7 +304,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 
 	//Selfdestruct
 	function ciao() external onlyOwner {
-		if (allPlayersWinnings > 0 || currentCasinoBalance < 1) {
+		if (allPlayersWinnings > 0) {
 			revert Roulette__WaitForAllPlayersWithdraws();
 		} else {
 			selfdestruct(payable(msg.sender));
@@ -325,7 +325,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 			revert Roulette__TransactionFailed();
 		}
 	}
-	
+
 	/* View (getter) Functions */
 	function getArrayOfBets() public view returns (Bet[] memory bets_) {
 		return betsArr;
