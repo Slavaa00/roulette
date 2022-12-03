@@ -609,7 +609,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 			} else if (_betType == 9) {
 				if (numbers[0] == 0) {
 					/* bet on black */
-					if (_rouletteWinNum < 11 || (_rouletteWinNum > 19 && _rouletteWinNum < 29)) {
+					if (_rouletteWinNum < 11 || (_rouletteWinNum > 18 && _rouletteWinNum < 29)) {
 						return won = (_rouletteWinNum % 2 == 0);
 					} else {
 						return won = (_rouletteWinNum % 2 == 1);
