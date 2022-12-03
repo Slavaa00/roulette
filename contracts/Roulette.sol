@@ -196,6 +196,8 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 		if (!upkeepNeeded) {
 			revert Roulette__UpkeepNotNeeded(moneyInTheBank, betsArr.length);
 		}
+		lastTimeStamp = block.timestamp;
+
 		rouletteState == RouletteState.SPINNING;
 
 		uint256 requestId = vrfCoordinator.requestRandomWords(
@@ -311,7 +313,6 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 		}
 	}
 
-	
 	receive() external payable {
 		emit ReceivedDirectValue(msg.sender, msg.value);
 	}
