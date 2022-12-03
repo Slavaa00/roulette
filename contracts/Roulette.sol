@@ -616,7 +616,7 @@ contract Roulette is VRFConsumerBaseV2, ReentrancyGuard, AutomationCompatibleInt
 					}
 				} else {
 					/* bet on red */
-					if (_rouletteWinNum < 11 || (_rouletteWinNum > 19 && _rouletteWinNum < 29)) {
+					if (_rouletteWinNum < 11 || (_rouletteWinNum > 18 && _rouletteWinNum < 29)) {
 						return won = (_rouletteWinNum % 2 == 1);
 					} else {
 						return won = (_rouletteWinNum % 2 == 0);
